@@ -5,6 +5,7 @@ import Data.Time(getCurrentTimeZone,getCurrentTime,utcToLocalTime)
 import Data.List(sort,intercalate)
 import Freedesktop.Trash(TrashFile(..),genTrashFile,trashGetOrphans,getTrashPaths,formatTrashDate,encodeTrashPath,trashGetFiles,trashRestore)
 import Control.Monad(when)
+import System.Exit(exitSuccess)
 
 actions =
     [ ("purge", fdoPurge)
@@ -31,12 +32,14 @@ data RmOptions = RmOptions
     { rmTimeOffset :: Double
     , rmVersion    :: Bool
     , rmHelp       :: Bool
+    , rmTrash      :: Maybe String
     } deriving(Show)
 
 rmDefaults = RmOptions
     { rmTimeOffset = 0
     , rmVersion = False
     , rmHelp = False
+    , rmTrash = Nothing
     }
 
 rmOptions =
@@ -44,16 +47,24 @@ rmOptions =
     , Option ['h'] ["help"] (NoArg (\opts -> opts{rmHelp=True})) "Print help"
     , Option ['t'] ["time"] (ReqArg  (\secs opts -> opts{rmTimeOffset=read secs}) "secs")
         ("Specify time offset, default: " ++ (show $ rmTimeOffset rmDefaults))
+    , Option ['T'] ["trash-path"] (ReqArg (\path opts -> opts{rmTrash=Just path}) "path")
+        "Override Trash path autodetection."
     ]
 
 fdoRm args = do
     (myOpts, realArgs) <- parseOpts rmDefaults rmOptions "fdo-rm" args
+    when (rmHelp myOpts) $ putStrLn
+        (usageInfo "Usage: fdo-rm [OPTION...] parameters..." rmOptions)
+        >> exitSuccess
+    (iPath,fPath) <- maybe
+        getTrashPaths
+        (\p -> return (p </> "info", p </> "files"))
+        (rmTrash myOpts)
     print myOpts
     when (null realArgs) $ ioError (userError "No files specified")
 
     now <- getCurrentTime
     let time = now
-    (iPath,fPath) <- getTrashPaths
     let file = TrashFile
             (iPath </> head args)
             (fPath </> head args)
@@ -69,6 +80,7 @@ data PurgeOptions = PurgeOptions
     , purgeSizePow   :: Double
     , purgeVersion   :: Bool
     , purgeHelp      :: Bool
+    , purgeTrash     :: Maybe String
     } deriving(Show)
 
 purgeDefaults = PurgeOptions
@@ -77,6 +89,7 @@ purgeDefaults = PurgeOptions
     , purgeSizePow = 0.1
     , purgeHelp = False
     , purgeVersion = False
+    , purgeTrash = Nothing
     }
 
 purgeOptions =
@@ -90,11 +103,19 @@ purgeOptions =
     , Option ['S'] ["size-power"] (ReqArg (\pow opts -> opts{purgeSizePow=read pow}) "pow")
         ("Specify size power for threshold formula size^sizepow*age^agepow, default: "
         ++ (show $ purgeSizePow purgeDefaults))
+    , Option ['T'] ["trash-path"] (ReqArg (\path opts -> opts{purgeTrash=Just path}) "path")
+        "Override Trash path autodetection."
     ]
 
 fdoPurge args = do
     (myOpts, _) <- parseOpts purgeDefaults purgeOptions "fdo-purge" args
-    (iPath,fPath) <- getTrashPaths
+    when (purgeHelp myOpts) $ putStrLn
+        (usageInfo "Usage: fdo-purge [OPTION...] parameters..." purgeOptions)
+        >> exitSuccess
+    (iPath,fPath) <- maybe
+        getTrashPaths
+        (\p -> return (p </> "info", p </> "files"))
+        (purgeTrash myOpts)
     timeZone <- getCurrentTimeZone
     (iExtra,dExtra) <- trashGetOrphans iPath fPath
     ayx <- trashGetFiles iPath fPath
@@ -110,6 +131,7 @@ data UnRmOptions = UnRmOptions
     , unRmHelp     :: Bool
     , unRmOutFile  :: Maybe String
     , unRmSelect   :: Maybe Int
+    , unRmTrash    :: Maybe String
     } deriving(Show)
 
 unRmDefaults = UnRmOptions
@@ -118,6 +140,7 @@ unRmDefaults = UnRmOptions
     , unRmVersion = False
     , unRmOutFile = Nothing
     , unRmSelect  = Nothing
+    , unRmTrash   = Nothing
     }
 
 unRmOptions =
@@ -129,6 +152,8 @@ unRmOptions =
         "Specify output file, conflicts with -O"
     , Option ['s'] ["select"] (ReqArg (\index opts -> opts{unRmSelect=Just $ read index}) "index")
         "Select file with index if multiple files match"
+    , Option ['T'] ["trash-path"] (ReqArg (\path opts -> opts{unRmTrash=Just path}) "path")
+        "Override Trash path autodetection."
     ]
 
 doRestore file opts saveFile = maybe
@@ -154,7 +179,13 @@ doUnRm files opts saveFile = do
 
 fdoUnRm args = do
     (myOpts, realArgs) <- parseOpts unRmDefaults unRmOptions "fdo-unrm" args
-    (iPath,fPath) <- getTrashPaths
+    when (unRmHelp myOpts) $ putStrLn
+        (usageInfo "Usage: fdo-rm [OPTION...] parameters..." unRmOptions)
+        >> exitSuccess
+    (iPath,fPath) <- maybe
+        getTrashPaths
+        (\p -> return (p </> "info", p </> "files"))
+        (unRmTrash myOpts)
     files <- trashGetFiles iPath fPath
     mapM_ (doUnRm files myOpts) realArgs
 
