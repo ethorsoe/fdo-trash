@@ -1,11 +1,11 @@
 import System.Environment(getArgs,getProgName)
 import System.Console.GetOpt(getOpt,ArgOrder(..),OptDescr(..),ArgDescr(..),usageInfo)
-import System.FilePath.Posix((</>),(<.>))
+import System.FilePath.Posix((</>),(<.>),isAbsolute,takeFileName)
 import System.Directory(getDirectoryContents)
 import Data.Maybe(catMaybes)
 import Data.Time(getCurrentTimeZone,getCurrentTime,utcToLocalTime)
 import Data.List(sort,intercalate)
-import Freedesktop.Trash(TrashFile(..),genTrashFile,trashGetOrphans,getTrashPaths,formatTrashDate,encodeTrashPath)
+import Freedesktop.Trash(TrashFile(..),genTrashFile,trashGetOrphans,getTrashPaths,formatTrashDate,encodeTrashPath,trashGetFiles,trashRestore)
 import Control.Monad(when)
 
 actions =
@@ -98,11 +98,9 @@ fdoPurge args = do
     (myOpts, _) <- parseOpts purgeDefaults purgeOptions "fdo-purge" args
     (iPath,fPath) <- getTrashPaths
     timeZone <- getCurrentTimeZone
-    infoFiles <- fmap (sort.filter (\x -> x /= ".." && x /= ".")) $ getDirectoryContents iPath
-    dataFiles <- fmap (sort.filter (\x -> x /= ".." && x /= ".")) $ getDirectoryContents fPath
-    let (iExtra,dExtra) = trashGetOrphans infoFiles (sort $ map (<.>"trashinfo") dataFiles)
+    (iExtra,dExtra) <- trashGetOrphans iPath fPath
+    ayx <- trashGetFiles iPath fPath
     print (iExtra,dExtra)
-    ayx <- fmap catMaybes $ mapM (genTrashFile iPath fPath timeZone) dataFiles
     print myOpts
     print args
     print ayx
@@ -113,7 +111,7 @@ data UnRmOptions = UnRmOptions
     , unRmVersion  :: Bool
     , unRmHelp     :: Bool
     , unRmOutFile  :: Maybe String
-    , unRmSelect   :: Maybe String
+    , unRmSelect   :: Maybe Int
     } deriving(Show)
 
 unRmDefaults = UnRmOptions
@@ -135,11 +133,33 @@ unRmOptions =
         "Select file with index if multiple files match"
     ]
 
+doRestore file opts saveFile = maybe
+    (if (unRmOrigDir opts)
+        then trashRestore file Nothing
+        else trashRestore file (Just saveFile))
+    (\out -> trashRestore file (Just out))
+    (unRmOutFile opts)
+
+doUnRm files opts saveFile = do
+    case (length files') of
+        0 -> putStrLn $ "No such file: " ++ saveFile
+        1 -> doRestore (head files') opts saveFile
+        _ -> maybe
+            (putStrLn $ "Multiple matches:\n" ++ unlines (zipWith (++) (map (\x -> show x ++ ": ") [0..])  (map origPath files') ))
+            (\index -> if (index < length files' && index >= 0)
+                then doRestore (files' !! index) opts saveFile
+                else putStrLn $ "Index " ++ show index ++ " out of bounds!")
+            (unRmSelect opts)
+    where files' = if (isAbsolute saveFile)
+            then filter (\x -> origPath x == saveFile) files
+            else filter (\x -> takeFileName (origPath x) == takeFileName saveFile) files
 
 fdoUnRm args = do
     (myOpts, realArgs) <- parseOpts unRmDefaults unRmOptions "fdo-unrm" args
+    (iPath,fPath) <- getTrashPaths
+    files <- trashGetFiles iPath fPath
     print myOpts
-    print realArgs
+    mapM_ (doUnRm files myOpts) realArgs
     putStrLn "TODO"
 
 --Main

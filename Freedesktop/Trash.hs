@@ -1,6 +1,9 @@
 module Freedesktop.Trash (
     TrashFile(..),
     trashGetOrphans,
+    trashGetFiles,
+    trashSortFiles,
+    trashRestore,
     genTrashFile,
     getPathSize,
     formatTrashDate,
@@ -22,7 +25,7 @@ import Data.Either(partitionEithers)
 import Control.Monad(when)
 import Data.Algorithm.Diff(getDiff,DI(..))
 import Data.List(sort)
-import System.Posix.Files(fileSize,getSymbolicLinkStatus,isRegularFile,isDirectory)
+import System.Posix.Files(fileSize,getSymbolicLinkStatus,isRegularFile,isDirectory,rename)
 
 
 data TrashFile = TrashFile {
@@ -76,14 +79,27 @@ genTrashFile riPath rdPath timeZone name = do
         (\(x,y) -> return.Just $ TrashFile iPath dPath y x size)
         parsed
 
-trashGetOrphans iFiles dFiles = (diffFst diff, diffSnd diff)
-    where diff               = getDiff iFiles dFiles
-          diffFst ((F,l):xs) = l : diffFst xs
+trashSortFiles iPath fPath= do
+    timeZone <- getCurrentTimeZone
+    iFiles <- fmap (sort.filter (\x -> x /= ".." && x /= ".")) $ getDirectoryContents iPath
+    dataFiles <- fmap (sort.filter (\x -> x /= ".." && x /= ".")) $ getDirectoryContents fPath
+    let  dFiles = sort $ map (<.>"trashinfo") dataFiles
+         diff   = getDiff iFiles dFiles
+    files <- fmap catMaybes $ mapM (genTrashFile iPath fPath timeZone) (diffBth diff)
+    return (files, (diffFst diff, map dropExtension $ diffSnd diff))
+    where diffFst ((F,l):xs) = l : diffFst xs
           diffFst []         = []
           diffFst (_:xs)     = diffFst xs
           diffSnd ((S,l):xs) = dropExtension l : diffSnd xs
           diffSnd []         = []
           diffSnd (_:xs)     = diffSnd xs
+          diffBth ((B,l):xs) = dropExtension l : diffBth xs
+          diffBth []         = []
+          diffBth (_:xs)     = diffBth xs
+
+trashGetOrphans iPath fPath = fmap snd $ trashSortFiles iPath fPath
+
+trashGetFiles iPath fPath = fmap fst $ trashSortFiles iPath fPath
 
 formatTrashDate :: FormatTime a => a -> String
 formatTrashDate = formatTime defaultTimeLocale (iso8601DateFormat $ Just "%H:%M:%S")
@@ -93,6 +109,9 @@ encodeTrashPath = encString False ok_url
 expungeTrash file = do
     removeDirectoryRecursive $ dataPath file
     removeDirectoryRecursive $ infoPath file
+
+trashRestore file condName =
+    rename (dataPath file) $ maybe (origPath file) id condName
 
 getPathSize path = do
     stat <- getSymbolicLinkStatus path
