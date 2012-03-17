@@ -25,8 +25,8 @@ import Data.Either(partitionEithers)
 import Control.Monad(when)
 import Data.Algorithm.Diff(getDiff,DI(..))
 import Data.List(sort)
-import System.Posix.Files(fileSize,getSymbolicLinkStatus,isRegularFile,isDirectory,rename)
-
+import System.Posix.Files(fileSize,getSymbolicLinkStatus,isRegularFile,isDirectory,rename,removeLink)
+import qualified System.IO.Error as E
 
 data TrashFile = TrashFile {
     infoPath   :: FilePath,
@@ -106,12 +106,17 @@ formatTrashDate = formatTime defaultTimeLocale (iso8601DateFormat $ Just "%H:%M:
 
 encodeTrashPath = encString False ok_url
 
-expungeTrash file = do
-    removeDirectoryRecursive $ dataPath file
-    removeDirectoryRecursive $ infoPath file
+doRemoveFile file = E.catch (removeDirectoryRecursive file)
+    (\_ -> E.try (removeLink file) >> return ())
+    >> return ()
 
-trashRestore file condName =
+expungeTrash file = do
+    doRemoveFile (dataPath file)
+    doRemoveFile (infoPath file)
+
+trashRestore file condName = do
     rename (dataPath file) $ maybe (origPath file) id condName
+    expungeTrash file
 
 getPathSize path = do
     stat <- getSymbolicLinkStatus path
