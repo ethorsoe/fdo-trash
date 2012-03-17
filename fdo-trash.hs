@@ -1,7 +1,7 @@
 import System.Environment(getArgs,getProgName)
 import System.Console.GetOpt(getOpt,ArgOrder(..),OptDescr(..),ArgDescr(..))
 import System.FilePath.Posix((</>),(<.>))
-import System.Directory(getDirectoryContents,removeDirectoryRecursive)
+import System.Directory(getDirectoryContents)
 import Data.Maybe(catMaybes)
 import Data.Time(getCurrentTimeZone,getCurrentTime,utcToLocalTime)
 import Data.List(sort)
@@ -11,6 +11,7 @@ import Freedesktop.Trash(TrashFile(..),genTrashFile,trashGetOrphans,getTrashPath
 actions =
     [ ("purge", fdoPurge)
     , ("rm", fdoRm)
+    , ("unrm", fdoUnRm)
     ]
 
 rmFile realPath trashFile = do
@@ -52,6 +53,9 @@ fdoPurge args = do
     ayx <- fmap catMaybes $ mapM (genTrashFile iPath fPath timeZone) dataFiles
     print args
     print ayx
+
+fdoUnRm args = do
+    putStrLn "TODO"
 
 main :: IO ()
 main = do

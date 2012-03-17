@@ -5,6 +5,7 @@ module Freedesktop.Trash (
     getPathSize,
     formatTrashDate,
     encodeTrashPath,
+    expungeTrash,
     getTrashPaths
 ) where
 
@@ -88,6 +89,10 @@ formatTrashDate :: FormatTime a => a -> String
 formatTrashDate = formatTime defaultTimeLocale (iso8601DateFormat $ Just "%H:%M:%S")
 
 encodeTrashPath = encString False ok_url
+
+expungeTrash file = do
+    removeDirectoryRecursive $ dataPath file
+    removeDirectoryRecursive $ infoPath file
 
 getPathSize path = do
     stat <- getSymbolicLinkStatus path
