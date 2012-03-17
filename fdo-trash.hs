@@ -1,7 +1,7 @@
 import Network.URL(encString,decString, ok_url)
 import System.Posix.Env(getEnv,getEnvDefault)
 import System.Environment(getArgs,getProgName)
-import System.Console.GetOpt(getOpt)
+import System.Console.GetOpt(getOpt,ArgOrder(..),OptDescr(..),ArgDescr(..))
 import System.FilePath.Posix((</>),(<.>),dropExtension)
 import System.Directory(getDirectoryContents,removeDirectoryRecursive)
 import Data.Maybe(fromJust,maybe,catMaybes)
@@ -104,17 +104,27 @@ rmFile realPath trashFile = do
     print trashFile
     print $ formatTime defaultTimeLocale (iso8601DateFormat $ Just "%H:%M:%S") (utcToLocalTime timeZone $ deleteTime trashFile)
 
+data RmFlag = Version | Time Int
+    deriving(Show)
+
+rmOptions =
+    [ Option ['V'] ["version"] (NoArg Version) "show version number"
+    , Option ['t'] ["time"] (ReqArg (Time . read) "blah") "Specify time offset"
+    ]
 
 fdoRm args = do
+    now <- getCurrentTime
+    let (opts, realArgs, _) = getOpt Permute rmOptions args
+        time = now
+    print opts
     (iPath,fPath) <- getTrashPaths
-    time <- getCurrentTime
     let file = TrashFile
             (iPath </> head args)
             (fPath </> head args)
-            (head args)
+            (head realArgs)
             time
             0
-    rmFile (head args) file
+    rmFile (head realArgs) file
 
 fdoPurge args = do
     (iPath,fPath) <- getTrashPaths
