@@ -1,8 +1,6 @@
 import System.Environment(getArgs,getProgName)
 import System.Console.GetOpt(getOpt,ArgOrder(..),OptDescr(..),ArgDescr(..),usageInfo)
-import System.FilePath.Posix((</>),(<.>),isAbsolute,takeFileName)
-import System.Directory(getDirectoryContents)
-import Data.Maybe(catMaybes)
+import System.FilePath.Posix((</>),isAbsolute,takeFileName)
 import Data.Time(getCurrentTimeZone,getCurrentTime,utcToLocalTime)
 import Data.List(sort,intercalate)
 import Freedesktop.Trash(TrashFile(..),genTrashFile,trashGetOrphans,getTrashPaths,formatTrashDate,encodeTrashPath,trashGetFiles,trashRestore)
@@ -158,9 +156,7 @@ fdoUnRm args = do
     (myOpts, realArgs) <- parseOpts unRmDefaults unRmOptions "fdo-unrm" args
     (iPath,fPath) <- getTrashPaths
     files <- trashGetFiles iPath fPath
-    print myOpts
     mapM_ (doUnRm files myOpts) realArgs
-    putStrLn "TODO"
 
 --Main
 main :: IO ()
