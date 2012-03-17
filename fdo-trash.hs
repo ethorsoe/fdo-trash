@@ -1,17 +1,18 @@
 import Network.URL(encString,decString, ok_url)
 import System.Posix.Env(getEnv,getEnvDefault)
+import System.Environment(getArgs,getProgName)
+import System.Console.GetOpt(getOpt)
 import System.FilePath.Posix((</>),(<.>),dropExtension)
-import System.Directory(getDirectoryContents,doesDirectoryExist)
+import System.Directory(getDirectoryContents,removeDirectoryRecursive)
 import Data.Maybe(fromJust,maybe,catMaybes)
 import System.Locale(iso8601DateFormat,defaultTimeLocale)
 import Text.ParserCombinators.Parsec(parse,many,try,(<|>),string,noneOf,oneOf,many)
-import Data.Time(getCurrentTimeZone,getCurrentTime,parseTime,localTimeToUTC,UTCTime)
+import Data.Time(getCurrentTimeZone,getCurrentTime,parseTime,localTimeToUTC,UTCTime,formatTime,utcToLocalTime)
 import Data.Either(partitionEithers)
 import Control.Monad(when)
 import Data.Algorithm.Diff(getDiff,DI(..))
 import Data.List(sort)
---import System.IO(IOMode(..),withFile,hFileSize)
-import System.Posix.Files(fileSize,getSymbolicLinkStatus,isRegularFile)
+import System.Posix.Files(fileSize,getSymbolicLinkStatus,isRegularFile,isDirectory)
 
 data TrashFile = TrashFile {
     infoPath   :: FilePath,
@@ -52,7 +53,7 @@ infoFile timeZone = do
     _ <- searchHeader
     (dates,names) <- fmap partitionEithers $ many line
     when (length dates /= 1 || length names /= 1) $ fail "Exactly one name and date not found."
-    return (localTimeToUTC timeZone (head dates), head names) 
+    return (localTimeToUTC timeZone (head dates), head names)
 
 genFile riPath rdPath timeZone name = do
     let iPath = riPath </> name <.> "trashinfo"
@@ -74,33 +75,74 @@ getOrphans iFiles dFiles = (diffFst diff, diffSnd diff)
           diffSnd (_:xs)     = diffSnd xs
 
 getPathSize path = do
-    isDirectory <- doesDirectoryExist path
-    if (isDirectory)
-      then do 
+    stat <- getSymbolicLinkStatus path
+    if (isDirectory stat)
+      then do
         files <- fmap (map (path</>) . filter (\x -> x /= ".." && x /= ".")) $ getDirectoryContents path
         fmap sum (mapM getPathSize files)
       else do
-        stat <- getSymbolicLinkStatus path
         if (isRegularFile stat)
           then return (fromIntegral $ fileSize stat)
           else return 0
 
-
-main :: IO ()
-main = do
+getTrashPaths = do
     defaultRoot <- fmap ((</> ".local/share/").fromJust) $ getEnv "HOME"
     rootPath <- fmap (</> "Trash") $ getEnvDefault "XDG_DATA_HOME" defaultRoot
     let iPath = rootPath </> "info"
     let fPath = rootPath </> "files"
+    return (iPath,fPath)
+
+actions =
+    [ ("purge", fdoPurge)
+    , ("rm", fdoRm)
+    ]
+
+rmFile realPath trashFile = do
+    timeZone <- getCurrentTimeZone
+    putStrLn "rename:"
+    print (encString False ok_url $ realPath)
+    print trashFile
+    print $ formatTime defaultTimeLocale (iso8601DateFormat $ Just "%H:%M:%S") (utcToLocalTime timeZone $ deleteTime trashFile)
+
+
+fdoRm args = do
+    (iPath,fPath) <- getTrashPaths
+    time <- getCurrentTime
+    let file = TrashFile
+            (iPath </> head args)
+            (fPath </> head args)
+            (head args)
+            time
+            0
+    rmFile (head args) file
+
+fdoPurge args = do
+    (iPath,fPath) <- getTrashPaths
     timeZone <- getCurrentTimeZone
     infoFiles <- fmap (sort.filter (\x -> x /= ".." && x /= ".")) $ getDirectoryContents iPath
     dataFiles <- fmap (sort.filter (\x -> x /= ".." && x /= ".")) $ getDirectoryContents fPath
     let (iExtra,dExtra) = getOrphans infoFiles (sort $ map (<.>"trashinfo") dataFiles)
     print (iExtra,dExtra)
     ayx <- fmap catMaybes $ mapM (genFile iPath fPath timeZone) dataFiles
+    print args
     print ayx
-    
-    
---print $ encString False ok_url "a% b"
---print $ fromJust (decString False "c%20d")
+
+main :: IO ()
+main = do
+    args <- getArgs
+    exe <- getProgName
+    let thisAction = maybe
+            ( if (null args)
+                then Nothing
+                else maybe
+                    (Nothing)
+                    (\x -> Just (tail args, x))
+                    (lookup (args !! 0) actions) )
+            (\x -> Just (args,x))
+            (lookup (drop 4 exe) actions)
+
+    maybe
+        (putStrLn "No action specified")
+        (\(a,f) -> f a)
+        thisAction
 
