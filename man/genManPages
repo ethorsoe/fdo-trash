@@ -2,8 +2,10 @@
 
 commands=(fdo-rm fdo-unrm fdo-purge)
 
-runhaskell Setup.hs configure
-runhaskell Setup.hs build
+if ! [[ -x dist/build/fdo-trash/fdo-trash ]]; then
+	runhaskell Setup.hs configure
+	runhaskell Setup.hs build
+fi
 
 for i in ${commands[*]}; do
 	ln -sf dist/build/fdo-trash/fdo-trash "$i"
