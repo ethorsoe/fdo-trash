@@ -1,5 +1,8 @@
 [Description]
 Moves files listed in parameters to Freedesktop Trashdir with properly formatted metadata.
+Time offset allows you to offset time into future '+' or past '-' in the
+deletion timestamp from current time. Time offset supports suffixes y, m, d, H,
+M and S for years, months, days, hours, minutes and seconds.
 
 [Conforming to]
 http://freedesktop.org/wiki/Specifications/trash-spec

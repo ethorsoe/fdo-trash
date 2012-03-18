@@ -71,7 +71,7 @@ rmOptions =
     , Option ['h'] ["help"] (NoArg (\opts -> opts{rmHelp=True})) "Print help"
     , Option ['t'] ["time-offset"] (ReqArg  (\offset opts ->
         opts{rmTimeOffset=parse timeOffsetString "" offset}) "offset")
-        "Specify time offset, default: 0d"
+        "Specify time offset suffixes ymdHMS supported, default: 0d"
     , Option ['T'] ["trash-path"] (ReqArg (\path opts -> opts{rmTrash=Just path}) "path")
         "Override Trash path autodetection."
     ]
