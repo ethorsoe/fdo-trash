@@ -1,0 +1,6 @@
+[Description]
+Moves files listed in parameters to Freedesktop Trashdir with properly formatted metadata.
+
+[Conforming to]
+http://freedesktop.org/wiki/Specifications/trash-spec
+

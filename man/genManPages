@@ -1,0 +1,13 @@
+#!/bin/bash
+
+commands=(fdo-rm fdo-unrm fdo-purge)
+
+runhaskell Setup.hs configure
+runhaskell Setup.hs build
+
+for i in ${commands[*]}; do
+	ln -sf dist/build/fdo-trash/fdo-trash "$i"
+	help2man -N -I man/$i.txt ./$i > $i.1
+	rm $i
+done
+

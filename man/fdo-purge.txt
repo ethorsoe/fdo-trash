@@ -1,0 +1,10 @@
+[Description]
+Purge old files from Freedesktop Trash. A path is purged from Trash if formula
+expression size^sizepow*age^agepow evaluates to value larger than maximum age.
+Ages are expressed in seconds. With default values the comparison expression
+evaluates typically in between 1 and 10 times the real age. If you want to purge
+just by the age use --size-power=0.
+
+[Conforming to]
+http://freedesktop.org/wiki/Specifications/trash-spec
+

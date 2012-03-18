@@ -1,0 +1,9 @@
+[Description]
+Undeletes files listed in parameters, parameter path can be with relative or
+absolute path. If relative path is used the path is ignored beyond the
+pathname. If multiple targets in Trash match all mathing files are listed to
+stdout with indices.
+
+[Conforming to]
+http://freedesktop.org/wiki/Specifications/trash-spec
+
