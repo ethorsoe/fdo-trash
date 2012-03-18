@@ -9,6 +9,29 @@ import System.Exit(exitSuccess)
 import Paths_fdo_trash(version)
 import Data.Version(showVersion)
 import System.Directory(createDirectoryIfMissing,canonicalizePath)
+import Text.Parsec(parse,many1,(<|>),char,oneOf,eof,option,digit,ParseError)
+
+minSecs   = 60
+hourSecs  = 60 *minSecs
+daySecs   = 24 *hourSecs
+monthSecs = 30 *daySecs
+yearSecs  = 365*daySecs
+
+timeOffsetString = do
+    sign <-  (char '-' >> return (-1))
+        <|> (option 1 (char '+' >> return 1))
+    num  <- option 1 (fmap read $ many1 digit)
+    mult <- option 'd' (oneOf "SMHdmy")
+    let multNum = case mult of
+         'S' -> 1
+         'M' -> minSecs
+         'H' -> hourSecs
+         'd' -> daySecs
+         'm' -> monthSecs
+         'y' -> yearSecs
+         _   -> undefined
+    eof
+    return $ sign*num*multNum
 
 printVersion = fmap (++ '-' : showVersion version) getProgName >>= putStrLn >> exitSuccess
 
@@ -30,14 +53,14 @@ parseOpts defaultOptions options exe argv =
 
 --Rm
 data RmOptions = RmOptions
-    { rmTimeOffset :: Double
+    { rmTimeOffset :: Either ParseError Double
     , rmVersion    :: Bool
     , rmHelp       :: Bool
     , rmTrash      :: Maybe String
     } deriving(Show)
 
 rmDefaults = RmOptions
-    { rmTimeOffset = 0
+    { rmTimeOffset = Right 0
     , rmVersion = False
     , rmHelp = False
     , rmTrash = Nothing
@@ -46,8 +69,9 @@ rmDefaults = RmOptions
 rmOptions =
     [ Option ['V'] ["version"] (NoArg (\opts -> opts{rmVersion=True})) "Show version number"
     , Option ['h'] ["help"] (NoArg (\opts -> opts{rmHelp=True})) "Print help"
-    , Option ['t'] ["time"] (ReqArg  (\secs opts -> opts{rmTimeOffset=read secs}) "secs")
-        ("Specify time offset, default: " ++ (show $ rmTimeOffset rmDefaults))
+    , Option ['t'] ["time-offset"] (ReqArg  (\offset opts ->
+        opts{rmTimeOffset=parse timeOffsetString "" offset}) "offset")
+        "Specify time offset, default: 0d"
     , Option ['T'] ["trash-path"] (ReqArg (\path opts -> opts{rmTrash=Just path}) "path")
         "Override Trash path autodetection."
     ]
@@ -73,7 +97,11 @@ fdoRm args = do
         (rmTrash myOpts)
     createDirectoryIfMissing True iPath
     createDirectoryIfMissing True fPath
-    time <- fmap (addUTCTime $ castFloat (rmTimeOffset myOpts)) getCurrentTime
+    timeOffset <- either
+        (\x -> ioError (userError $ "Invalid time format" ++ show x))
+        (\x -> return x)
+        (rmTimeOffset myOpts)
+    time <- fmap (addUTCTime $ castFloat timeOffset) getCurrentTime
     mapM_ (doRm time iPath fPath) (map dropTrailingPathSeparator realArgs)
 
 --Purge
