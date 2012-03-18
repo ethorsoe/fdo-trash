@@ -1,19 +1,19 @@
-name:            fdo
+name:            fdo-trash
 version:         0.0.0.0
 copyright:       (c) 2012 Emil Karlson
 license:         BSD3
 author:          Emil Karlson <jekarlson@gmail.com>
 maintainer:      Emil Karlson <jekarlson@gmail.com>
 category:        Desktop
-synopsis:        Utilities related to freedesktop standards.
-description:     TODO
+synopsis:        Utilities related to freedesktop Trash standard.
+description:     Contains utilities to unrm from trash, purge old files from trash and move files to trash.
 stability:       provisional
 build-type:      Simple
 cabal-version:   >= 1.8
 
 library
   exposed-modules: Freedesktop.Trash
-  other-modules:   Paths_fdo
+  other-modules:   Paths_fdo_trash
   build-depends:   base < 5,
                    unix < 3,
                    Diff,
@@ -28,7 +28,7 @@ library
 executable fdo-trash
   Main-is:       fdo-trash.hs
   Build-Depends: base >= 3 && < 5,
-                 fdo,
+                 fdo-trash,
                  Diff,
                  parsec,
                  old-locale,

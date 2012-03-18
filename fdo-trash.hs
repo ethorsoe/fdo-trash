@@ -6,7 +6,7 @@ import Data.List(intercalate)
 import Freedesktop.Trash(TrashFile(..),trashGetOrphans,getTrashPaths,trashGetFiles,trashRestore,expungeTrash,moveToTrash)
 import Control.Monad(when)
 import System.Exit(exitSuccess)
-import Paths_fdo(version)
+import Paths_fdo_trash(version)
 import Data.Version(showVersion)
 import System.Directory(createDirectoryIfMissing)
 
