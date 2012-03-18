@@ -182,7 +182,7 @@ doUnRm files opts saveFile = do
 fdoUnRm args = do
     (myOpts, realArgs) <- parseOpts unRmDefaults unRmOptions "fdo-unrm" args
     when (unRmHelp myOpts) $ putStrLn
-        (usageInfo "Usage: fdo-rm [OPTION...] parameters..." unRmOptions)
+        (usageInfo "Usage: fdo-unrm [OPTION...] parameters..." unRmOptions)
         >> exitSuccess
     (iPath,fPath) <- maybe
         getTrashPaths
