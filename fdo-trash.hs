@@ -1,9 +1,9 @@
 import System.Environment(getArgs,getProgName)
 import System.Console.GetOpt(getOpt,ArgOrder(..),OptDescr(..),ArgDescr(..),usageInfo)
 import System.FilePath.Posix((</>),isAbsolute,takeFileName)
-import Data.Time(getCurrentTimeZone,getCurrentTime,utcToLocalTime)
-import Data.List(sort,intercalate)
-import Freedesktop.Trash(TrashFile(..),genTrashFile,trashGetOrphans,getTrashPaths,formatTrashDate,encodeTrashPath,trashGetFiles,trashRestore)
+import Data.Time(getCurrentTimeZone,getCurrentTime,utcToLocalTime,diffUTCTime)
+import Data.List(intercalate)
+import Freedesktop.Trash(TrashFile(..),trashGetOrphans,getTrashPaths,formatTrashDate,encodeTrashPath,trashGetFiles,trashRestore,expungeTrash)
 import Control.Monad(when)
 import System.Exit(exitSuccess)
 
@@ -116,13 +116,15 @@ fdoPurge args = do
         getTrashPaths
         (\p -> return (p </> "info", p </> "files"))
         (purgeTrash myOpts)
-    timeZone <- getCurrentTimeZone
+    now <- getCurrentTime
     (iExtra,dExtra) <- trashGetOrphans iPath fPath
-    ayx <- trashGetFiles iPath fPath
-    print (iExtra,dExtra)
-    print myOpts
-    print args
-    print ayx
+    ayx <- fmap
+        (filter (\x -> (max 0 $ fromRational.toRational $ diffUTCTime now $ deleteTime x)**(purgeAgePow myOpts) *
+            (max 1 $ fromIntegral $ totalSize x)**(purgeSizePow myOpts) > purgeThreshold myOpts))
+        $ trashGetFiles iPath fPath
+    when (not$null iExtra) $ putStrLn "Orphan files detected:\n" >> print iExtra
+    when (not$null dExtra) $ putStrLn "Orphan files detected:\n" >> print dExtra
+    mapM_ expungeTrash ayx
 
 --Unrm
 data UnRmOptions = UnRmOptions
@@ -168,7 +170,7 @@ doUnRm files opts saveFile = do
         0 -> putStrLn $ "No such file: " ++ saveFile
         1 -> doRestore (head files') opts saveFile
         _ -> maybe
-            (putStrLn $ "Multiple matches:\n" ++ unlines (zipWith (++) (map (\x -> show x ++ ": ") [0..])  (map origPath files') ))
+            (putStrLn $ "Multiple matches:\n" ++ unlines (zipWith (++) (map (\x -> show x ++ ": ") [(0::Int)..])  (map origPath files') ))
             (\index -> if (index < length files' && index >= 0)
                 then doRestore (files' !! index) opts saveFile
                 else putStrLn $ "Index " ++ show index ++ " out of bounds!")
