@@ -1,6 +1,6 @@
 import System.Environment(getArgs,getProgName)
 import System.Console.GetOpt(getOpt,ArgOrder(..),OptDescr(..),ArgDescr(..),usageInfo)
-import System.FilePath.Posix((</>),(<.>),isAbsolute,takeFileName)
+import System.FilePath.Posix((</>),(<.>),isAbsolute,takeFileName,dropTrailingPathSeparator)
 import Data.Time(getCurrentTime,diffUTCTime,addUTCTime)
 import Data.List(intercalate)
 import Freedesktop.Trash(TrashFile(..),trashGetOrphans,getTrashPaths,trashGetFiles,trashRestore,expungeTrash,moveToTrash)
@@ -8,7 +8,7 @@ import Control.Monad(when)
 import System.Exit(exitSuccess)
 import Paths_fdo_trash(version)
 import Data.Version(showVersion)
-import System.Directory(createDirectoryIfMissing)
+import System.Directory(createDirectoryIfMissing,canonicalizePath)
 
 printVersion = fmap (++ '-' : showVersion version) getProgName >>= putStrLn >> exitSuccess
 
@@ -52,11 +52,12 @@ rmOptions =
         "Override Trash path autodetection."
     ]
 
-doRm time iPath fPath fileName =
+doRm time iPath fPath fileName = do
+    absFile <- canonicalizePath fileName
     moveToTrash $ TrashFile
-            (iPath </> fileName <.> "trashinfo")
-            (fPath </> fileName)
-            fileName
+            (iPath </> takeFileName fileName <.> "trashinfo")
+            (fPath </> takeFileName fileName)
+            absFile
             time
             0
 
@@ -73,7 +74,7 @@ fdoRm args = do
     createDirectoryIfMissing True iPath
     createDirectoryIfMissing True fPath
     time <- fmap (addUTCTime $ castFloat (rmTimeOffset myOpts)) getCurrentTime
-    mapM_ (doRm time iPath fPath) realArgs
+    mapM_ (doRm time iPath fPath) (map dropTrailingPathSeparator realArgs)
 
 --Purge
 data PurgeOptions = PurgeOptions
