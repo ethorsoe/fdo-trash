@@ -1,15 +1,19 @@
 import System.Environment(getArgs,getProgName)
 import System.Console.GetOpt(getOpt,ArgOrder(..),OptDescr(..),ArgDescr(..),usageInfo)
-import System.FilePath.Posix((</>),isAbsolute,takeFileName)
-import Data.Time(getCurrentTimeZone,getCurrentTime,utcToLocalTime,diffUTCTime)
+import System.FilePath.Posix((</>),(<.>),isAbsolute,takeFileName)
+import Data.Time(getCurrentTime,diffUTCTime,addUTCTime)
 import Data.List(intercalate)
-import Freedesktop.Trash(TrashFile(..),trashGetOrphans,getTrashPaths,formatTrashDate,encodeTrashPath,trashGetFiles,trashRestore,expungeTrash)
+import Freedesktop.Trash(TrashFile(..),trashGetOrphans,getTrashPaths,trashGetFiles,trashRestore,expungeTrash,moveToTrash)
 import Control.Monad(when)
 import System.Exit(exitSuccess)
 import Paths_fdo(version)
 import Data.Version(showVersion)
+import System.Directory(createDirectoryIfMissing)
 
 printVersion = fmap (++ '-' : showVersion version) getProgName >>= putStrLn >> exitSuccess
+
+castFloat :: (Real a, Fractional b) => a -> b
+castFloat = fromRational.toRational
 
 actions =
     [ ("purge", fdoPurge)
@@ -25,13 +29,6 @@ parseOpts defaultOptions options exe argv =
     where header = "Usage: " ++ exe ++ " [OPTION...] parameters..."
 
 --Rm
-rmFile realPath trashFile = do
-    timeZone <- getCurrentTimeZone
-    putStrLn "rename:"
-    print (encodeTrashPath realPath)
-    print trashFile
-    print $ formatTrashDate (utcToLocalTime timeZone $ deleteTime trashFile)
-
 data RmOptions = RmOptions
     { rmTimeOffset :: Double
     , rmVersion    :: Bool
@@ -55,6 +52,14 @@ rmOptions =
         "Override Trash path autodetection."
     ]
 
+doRm time iPath fPath fileName =
+    moveToTrash $ TrashFile
+            (iPath </> fileName <.> "trashinfo")
+            (fPath </> fileName)
+            fileName
+            time
+            0
+
 fdoRm args = do
     (myOpts, realArgs) <- parseOpts rmDefaults rmOptions "fdo-rm" args
     when (rmVersion myOpts) printVersion
@@ -65,18 +70,10 @@ fdoRm args = do
         getTrashPaths
         (\p -> return (p </> "info", p </> "files"))
         (rmTrash myOpts)
-    print myOpts
-    when (null realArgs) $ ioError (userError "No files specified")
-
-    now <- getCurrentTime
-    let time = now
-    let file = TrashFile
-            (iPath </> head args)
-            (fPath </> head args)
-            (head realArgs)
-            time
-            0
-    rmFile (head realArgs) file
+    createDirectoryIfMissing True iPath
+    createDirectoryIfMissing True fPath
+    time <- fmap (addUTCTime $ castFloat (rmTimeOffset myOpts)) getCurrentTime
+    mapM_ (doRm time iPath fPath) realArgs
 
 --Purge
 data PurgeOptions = PurgeOptions
@@ -122,10 +119,12 @@ fdoPurge args = do
         getTrashPaths
         (\p -> return (p </> "info", p </> "files"))
         (purgeTrash myOpts)
+    createDirectoryIfMissing True iPath
+    createDirectoryIfMissing True fPath
     now <- getCurrentTime
     (iExtra,dExtra) <- trashGetOrphans iPath fPath
     ayx <- fmap
-        (filter (\x -> (max 0 $ fromRational.toRational $ diffUTCTime now $ deleteTime x)**(purgeAgePow myOpts) *
+        (filter (\x -> (max 0 $ castFloat $ diffUTCTime now $ deleteTime x)**(purgeAgePow myOpts) *
             (max 1 $ fromIntegral $ totalSize x)**(purgeSizePow myOpts) > purgeThreshold myOpts))
         $ trashGetFiles iPath fPath
     when (not$null iExtra) $ putStrLn "Orphan files detected:\n" >> print iExtra
@@ -195,6 +194,8 @@ fdoUnRm args = do
         getTrashPaths
         (\p -> return (p </> "info", p </> "files"))
         (unRmTrash myOpts)
+    createDirectoryIfMissing True iPath
+    createDirectoryIfMissing True fPath
     files <- trashGetFiles iPath fPath
     mapM_ (doUnRm files myOpts) realArgs
 

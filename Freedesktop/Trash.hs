@@ -5,6 +5,7 @@ module Freedesktop.Trash (
     trashSortFiles,
     trashRestore,
     genTrashFile,
+    moveToTrash,
     getPathSize,
     formatTrashDate,
     encodeTrashPath,
@@ -15,17 +16,17 @@ module Freedesktop.Trash (
 
 import Network.URL(encString,decString, ok_url)
 import System.Posix.Env(getEnv,getEnvDefault)
-import System.FilePath.Posix((</>),(<.>),dropExtension)
+import System.FilePath.Posix((</>),(<.>),dropExtension,splitExtension)
 import System.Directory(getDirectoryContents,removeDirectoryRecursive)
 import Data.Maybe(fromJust,catMaybes)
 import System.Locale(iso8601DateFormat,defaultTimeLocale)
 import Text.ParserCombinators.Parsec(parse,many,try,(<|>),string,noneOf,oneOf,many)
-import Data.Time(getCurrentTimeZone,getCurrentTime,parseTime,localTimeToUTC,UTCTime,formatTime,utcToLocalTime,FormatTime)
+import Data.Time(getCurrentTimeZone,parseTime,localTimeToUTC,UTCTime,formatTime,utcToLocalTime,FormatTime)
 import Data.Either(partitionEithers)
 import Control.Monad(when)
 import Data.Algorithm.Diff(getDiff,DI(..))
 import Data.List(sort)
-import System.Posix.Files(fileSize,getSymbolicLinkStatus,isRegularFile,isDirectory,rename,removeLink)
+import System.Posix.Files(fileSize,getSymbolicLinkStatus,isRegularFile,isDirectory,rename,removeLink,fileExist)
 import qualified System.IO.Error as E
 
 data TrashFile = TrashFile {
@@ -36,7 +37,9 @@ data TrashFile = TrashFile {
     totalSize  :: Integer
     } deriving (Show)
 
-headerLine = string "[Trash Info]\n"
+trashHeaderString = "[Trash Info]\n"
+
+headerLine = string trashHeaderString
 
 dateLine = do
     _ <- string "DeletionDate="
@@ -135,4 +138,38 @@ getTrashPaths = do
     let iPath = rootPath </> "info"
     let fPath = rootPath </> "files"
     return (iPath,fPath)
+
+getFreeTrashSlot :: TrashFile -> Maybe Int -> IO TrashFile
+getFreeTrashSlot trashFile Nothing = do
+    iExists <- fileExist $ infoPath trashFile
+    dExists <- fileExist $ dataPath trashFile
+    if (iExists || dExists)
+      then getFreeTrashSlot trashFile (Just 0)
+      else return trashFile
+getFreeTrashSlot trashFile (Just index) = do
+    let (iPath',iExt2)     = splitExtension $ infoPath trashFile
+        (iPath,iExt1)      = splitExtension $ iPath'
+        (dPath,dExt)       = splitExtension $ dataPath trashFile
+        iTry               = iPath <.> show index <.> iExt1 <.> iExt2
+        dTry               = dPath <.> show index <.> dExt
+
+    iExists <- fileExist iTry
+    dExists <- fileExist dTry
+    if (iExists || dExists)
+      then getFreeTrashSlot trashFile (Just $ index + 1)
+      else return trashFile{infoPath=iTry, dataPath=dTry}
+
+doMoveToTrash trashFile = do
+    timeZone <- getCurrentTimeZone
+    writeFile (infoPath trashFile)
+        (  trashHeaderString
+        ++ "Path=" ++ (encodeTrashPath $ origPath trashFile) ++ "\n"
+        ++ "DeletionDate=" ++ formatTrashDate (utcToLocalTime timeZone $ deleteTime trashFile) ++ "\n"
+        )
+    rename (origPath trashFile) (dataPath trashFile)
+
+moveToTrash trashFile = do
+    yes <- fileExist $ origPath trashFile
+    target <- getFreeTrashSlot trashFile Nothing
+    when yes $ doMoveToTrash target
 
