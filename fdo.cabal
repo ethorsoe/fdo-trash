@@ -13,6 +13,7 @@ cabal-version:   >= 1.8
 
 library
   exposed-modules: Freedesktop.Trash
+  other-modules:   Paths_fdo
   build-depends:   base < 5,
                    unix < 3,
                    Diff,

@@ -6,6 +6,10 @@ import Data.List(intercalate)
 import Freedesktop.Trash(TrashFile(..),trashGetOrphans,getTrashPaths,formatTrashDate,encodeTrashPath,trashGetFiles,trashRestore,expungeTrash)
 import Control.Monad(when)
 import System.Exit(exitSuccess)
+import Paths_fdo(version)
+import Data.Version(showVersion)
+
+printVersion = fmap (++ '-' : showVersion version) getProgName >>= putStrLn >> exitSuccess
 
 actions =
     [ ("purge", fdoPurge)
@@ -53,6 +57,7 @@ rmOptions =
 
 fdoRm args = do
     (myOpts, realArgs) <- parseOpts rmDefaults rmOptions "fdo-rm" args
+    when (rmVersion myOpts) printVersion
     when (rmHelp myOpts) $ putStrLn
         (usageInfo "Usage: fdo-rm [OPTION...] parameters..." rmOptions)
         >> exitSuccess
@@ -109,6 +114,7 @@ purgeOptions =
 
 fdoPurge args = do
     (myOpts, _) <- parseOpts purgeDefaults purgeOptions "fdo-purge" args
+    when (purgeVersion myOpts) printVersion
     when (purgeHelp myOpts) $ putStrLn
         (usageInfo "Usage: fdo-purge [OPTION...] parameters..." purgeOptions)
         >> exitSuccess
@@ -181,6 +187,7 @@ doUnRm files opts saveFile = do
 
 fdoUnRm args = do
     (myOpts, realArgs) <- parseOpts unRmDefaults unRmOptions "fdo-unrm" args
+    when (unRmVersion myOpts) printVersion
     when (unRmHelp myOpts) $ putStrLn
         (usageInfo "Usage: fdo-unrm [OPTION...] parameters..." unRmOptions)
         >> exitSuccess
