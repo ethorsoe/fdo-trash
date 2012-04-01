@@ -161,12 +161,12 @@ getFreeTrashSlot trashFile (Just index) = do
 
 doMoveToTrash trashFile = do
     timeZone <- getCurrentTimeZone
+    rename (origPath trashFile) (dataPath trashFile)
     writeFile (infoPath trashFile)
         (  trashHeaderString
         ++ "Path=" ++ (encodeTrashPath $ origPath trashFile) ++ "\n"
         ++ "DeletionDate=" ++ formatTrashDate (utcToLocalTime timeZone $ deleteTime trashFile) ++ "\n"
         )
-    rename (origPath trashFile) (dataPath trashFile)
 
 moveToTrash trashFile = do
     yes <- fileExist $ origPath trashFile
