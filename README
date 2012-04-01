@@ -1,0 +1,13 @@
+The package creates utility called fdo-trash and a small library that provides
+much of the same functionality.
+
+Fdo trash has 3 utilities, fdo-rm, fdo-unrm and fdo-purge. These executable can
+be invoked by symlinking fdo-trash to properly named file (like busybox) or via
+fdo-trash with applet name (eg. fdo-trash rm [file]).
+
+Use man/genManPages to generate man pages for the utilities. (requires
+help2man).
+
+fdo-rm moves files to freedesktop trash, fdo-unrm moves them back and fdo-purge
+removes obsolete files from trash.
+
