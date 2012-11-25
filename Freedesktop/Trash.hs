@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Freedesktop.Trash (
     TrashFile(..),
     trashGetOrphans,
@@ -27,7 +29,16 @@ import Control.Monad(when)
 import Data.Algorithm.Diff(getDiff,DI(..))
 import Data.List(sort)
 import System.Posix.Files(fileSize,getSymbolicLinkStatus,isRegularFile,isDirectory,rename,removeLink,fileExist)
-import qualified System.IO.Error as E
+#if MIN_VERSION_base(4,6,0)
+import System.IO.Error(catchIOError,tryIOError)
+eCatch = catchIOError
+eTry = tryIOError
+#else
+import qualified System.IO.Error(try, catch)
+eCatch = System.IO.Error.catch
+eTry = System.IO.Error.try
+#endif
+
 
 data TrashFile = TrashFile {
     infoPath   :: FilePath,
@@ -109,8 +120,8 @@ formatTrashDate = formatTime defaultTimeLocale (iso8601DateFormat $ Just "%H:%M:
 
 encodeTrashPath = encString False ok_url
 
-doRemoveFile file = E.catch (removeDirectoryRecursive file)
-    (\_ -> E.try (removeLink file) >> return ())
+doRemoveFile file = eCatch (removeDirectoryRecursive file)
+    (\_ -> eTry (removeLink file) >> return ())
     >> return ()
 
 expungeTrash file = do
