@@ -31,7 +31,7 @@ executable fdo-trash
   Main-is:       fdo-trash.hs
   Build-Depends: base >= 3 && < 5,
                  fdo-trash,
-                 Diff,
+                 Diff >= 0.2,
                  parsec,
                  old-locale,
                  directory,
