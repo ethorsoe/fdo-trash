@@ -2,6 +2,7 @@ name:            fdo-trash
 version:         0.0.0.2
 copyright:       (c) 2012 Emil Karlson
 license:         BSD3
+license-file:    LICENSE
 author:          Emil Karlson <jekarlson@gmail.com>
 maintainer:      Emil Karlson <jekarlson@gmail.com>
 category:        Desktop
